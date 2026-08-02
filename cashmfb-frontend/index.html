@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CashMFB</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --primary:#5B2A86; --gold:#D4AF37; --bg:#F8F6FB; --field:#F0F0F0; --grey:#999; --dgrey:#555; }
+  * { box-sizing: border-box; margin:0; padding:0; }
+  body { font-family:'Poppins',sans-serif; background:var(--bg); min-height:100vh; display:flex; justify-content:center; padding:24px 16px; }
+  .app { width:100%; max-width:390px; }
+  .logo { text-align:center; font-size:28px; font-weight:700; color:var(--primary); margin-bottom:4px; }
+  .subtitle { text-align:center; font-size:14px; color:var(--dgrey); margin-bottom:24px; }
+  .card { background:#fff; border-radius:16px; padding:24px; margin-bottom:16px; box-shadow:0 4px 16px rgba(91,42,134,0.08); }
+  h3 { margin-bottom:14px; color:var(--primary); font-size:15px; font-weight:600; }
+  input, select { width:100%; padding:13px 16px; margin:6px 0; background:var(--field); border:none; border-radius:12px; font-size:14px; font-family:'Poppins',sans-serif; color:#333; outline:none; }
+  input::placeholder { color:var(--grey); }
+  input:focus, select:focus { box-shadow:0 0 0 2px var(--primary); }
+  .btn-gold { width:100%; padding:14px; background:var(--gold); color:#2b1a00; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; margin-top:10px; font-family:'Poppins',sans-serif; }
+  .btn-gold-small { padding:10px; font-size:13px; margin-top:6px; }
+  .link-text { text-align:center; font-size:13px; color:var(--dgrey); margin-top:14px; }
+  .link-text b { color:var(--primary); cursor:pointer; }
+  .greeting { color:var(--primary); font-size:18px; font-weight:600; margin-bottom:14px; }
+  .balance-card { background:var(--primary); color:white; text-align:center; }
+  .balance-label { font-size:12px; opacity:0.85; letter-spacing:1px; }
+  .balance-amount { font-size:34px; font-weight:700; margin:8px 0 4px; color:var(--gold); }
+  .logout-link { display:inline-block; margin-top:8px; font-size:12px; color:rgba(255,255,255,0.75); cursor:pointer; text-decoration:underline; }
+  .quick-actions { display:flex; justify-content:space-between; margin-bottom:16px; }
+  .quick-action { text-align:center; width:22%; cursor:pointer; }
+  .quick-action-icon { width:52px; height:52px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:20px; margin:0 auto 6px; }
+  .quick-action-label { font-size:11px; color:var(--gold); font-weight:600; }
+  .tabs { display:flex; background:#fff; border-radius:12px; padding:4px; margin-bottom:16px; box-shadow:0 2px 8px rgba(91,42,134,0.08); }
+  .tab { flex:1; text-align:center; padding:9px 4px; border-radius:9px; color:var(--dgrey); font-size:12px; font-weight:600; cursor:pointer; }
+  .tab.active { background:var(--primary); color:#fff; }
+  .tx { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #f0f0f0; }
+  .tx:last-child { border-bottom:none; }
+  .tx-left { display:flex; align-items:center; gap:10px; }
+  .tx-icon { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .credit-icon { background:#e6f4ea; color:#16a34a; }
+  .debit-icon { background:#fbe9e9; color:#dc2626; }
+  .tx-narration { font-size:13px; font-weight:600; color:#222; }
+  .tx-date { font-size:11px; color:#999; }
+  .tx-amount { font-weight:700; font-size:13px; }
+  .amount-credit { color:#16a34a; }
+  .amount-debit { color:#dc2626; }
+  .method-row { display:flex; gap:8px; margin:8px 0; }
+  .method-box { flex:1; text-align:center; padding:10px 4px; border-radius:12px; background:var(--field); font-size:12px; color:var(--dgrey); cursor:pointer; font-weight:600; }
+  .method-box.active { background:var(--primary); color:#fff; }
+  .bill-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+  .bill-tile { background:#fff; border-radius:14px; padding:16px 10px; text-align:center; cursor:pointer; box-shadow:0 2px 8px rgba(91,42,134,0.08); }
+  .bill-tile.active { outline:2px solid var(--primary); }
+  .bill-icon { font-size:24px; margin-bottom:6px; }
+  .bill-label { font-size:12px; font-weight:600; color:var(--primary); }
+  .progress-track { background:var(--field); border-radius:20px; height:10px; margin:8px 0 4px; overflow:hidden; }
+  .progress-fill { background:var(--gold); height:100%; border-radius:20px; }
+  .goal-card { border:1px solid #eee; border-radius:12px; padding:14px; margin-bottom:12px; }
+  .goal-name { font-weight:600; color:var(--primary); font-size:14px; }
+  .goal-nums { font-size:12px; color:var(--dgrey); margin:4px 0 8px; }
+  .goal-actions { display:flex; gap:8px; }
+  .goal-actions input { flex:1; margin:0; padding:8px 10px; font-size:12px; }
+  .goal-actions button { width:auto; padding:8px 12px; font-size:12px; margin:0; }
+  .badge { display:inline-block; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .badge-active { background:#fdf3d9; color:#92400e; }
+  .badge-none { background:#f1f1f1; color:#777; }
+  .note { font-size:11px; color:#3a6b3a; background:#eaf5ea; padding:8px 10px; border-radius:8px; margin:8px 0; }
+  .eligibility-line { display:flex; justify-content:space-between; font-size:12px; color:var(--dgrey); padding:4px 0; }
+  #message { text-align:center; color:#d33; font-size:13px; min-height:18px; margin-bottom:8px; }
+  .hidden { display:none; }
+  .checkbox-row { display:flex; align-items:flex-start; gap:8px; margin:10px 0; font-size:12px; color:var(--dgrey); }
+</style>
+</head>
+<body>
+<div class="app">
+  <p id="message"></p>
+
+  <div id="loginScreen">
+    <div class="logo">CashMFB</div>
+    <div class="subtitle">Welcome back, log in to continue</div>
+    <div class="card">
+      <input id="loginEmail" placeholder="Email or Phone Number">
+      <input id="loginPassword" type="password" placeholder="Password">
+      <button class="btn-gold" onclick="login()">Log In</button>
+      <div class="link-text">Forgot Password?</div>
+      <div class="link-text">Don't have an account? <b onclick="showScreen('signup')">Sign Up</b></div>
+    </div>
+  </div>
+
+  <div id="signupScreen" class="hidden">
+    <div class="logo">CashMFB</div>
+    <div class="subtitle">Create your account</div>
+    <div class="card">
+      <input id="regName" placeholder="Full Name">
+      <input id="regEmail" placeholder="Email">
+      <input id="regPhone" placeholder="Phone Number">
+      <input id="regPassword" type="password" placeholder="Password">
+      <input id="regPasswordConfirm" type="password" placeholder="Confirm Password">
+      <label class="checkbox-row"><input type="checkbox" id="agreeTerms" style="width:auto;margin:2px 0;"> I agree to the <b style="color:var(--primary)">Terms & Conditions</b> and Privacy Policy</label>
+      <button class="btn-gold" onclick="register()">Sign Up</button>
+      <div class="link-text">Already have an account? <b onclick="showScreen('login')">Log In</b></div>
+    </div>
+  </div>
+
+  <div id="dashboard" class="hidden">
+    <div class="greeting" id="greeting">Hi 👋</div>
+    <div class="card balance-card">
+      <div class="balance-label">WALLET BALANCE</div>
+      <div class="balance-amount" id="balance">₦0</div>
+      <div class="logout-link" onclick="logout()">Log out</div>
+    </div>
+
+    <div class="quick-actions">
+      <div class="quick-action" onclick="switchTab('wallet')"><div class="quick-action-icon">↑</div><div class="quick-action-label">Send</div></div>
+      <div class="quick-action" onclick="switchTab('wallet')"><div class="quick-action-icon">＋</div><div class="quick-action-label">Fund</div></div>
+      <div class="quick-action" onclick="switchTab('bills')"><div class="quick-action-icon">⚡</div><div class="quick-action-label">Bills</div></div>
+      <div class="quick-action" onclick="switchTab('loans')"><div class="quick-action-icon">₦</div><div class="quick-action-label">Loans</div></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="wallet" onclick="switchTab('wallet')">Wallet</div>
+      <div class="tab" data-tab="savings" onclick="switchTab('savings')">Savings</div>
+      <div class="tab" data-tab="loans" onclick="switchTab('loans')">Loans</div>
+      <div class="tab" data-tab="bills" onclick="switchTab('bills')">Bills</div>
+    </div>
+
+    <div id="tab-wallet" class="tab-content">
+      <div class="card">
+        <h3>Fund Wallet</h3>
+        <input id="depositAmount" type="number" placeholder="Enter Amount">
+        <div class="method-row">
+          <div class="method-box active" onclick="selectMethod(this)">Card</div>
+          <div class="method-box" onclick="selectMethod(this)">Bank Transfer</div>
+          <div class="method-box" onclick="selectMethod(this)">USSD</div>
+        </div>
+        <div class="note">Demo mode: credits your wallet directly for testing.</div>
+        <button class="btn-gold" onclick="deposit()">Fund Wallet</button>
+      </div>
+      <div class="card" id="transferCard">
+        <h3>Send Money</h3>
+        <input id="transferEmail" placeholder="Recipient (Email)">
+        <input id="transferAmount" type="number" placeholder="Amount">
+        <input id="transferNote" placeholder="Note (optional)">
+        <button class="btn-gold" onclick="showTransferConfirm()">Send</button>
+      </div>
+      <div class="card hidden" id="confirmCard">
+        <h3>Confirm Transfer</h3>
+        <p style="font-size:14px;margin-bottom:6px;">To: <b id="confirmEmail"></b></p>
+        <p style="font-size:14px;margin-bottom:14px;">Amount: <b id="confirmAmount"></b></p>
+        <button class="btn-gold" onclick="transfer()">Confirm & Send</button>
+        <div class="link-text" onclick="hideTransferConfirm()"><b>Cancel</b></div>
+      </div>
+      <div class="card">
+        <h3>Recent Transactions</h3>
+        <div id="historyList"></div>
+      </div>
+    </div>
+
+    <div id="tab-savings" class="tab-content hidden">
+      <div class="card balance-card">
+        <div class="balance-label">TOTAL SAVED</div>
+        <div class="balance-amount" id="savingsBalance">₦0</div>
+      </div>
+      <div class="card">
+        <h3>New Savings Goal</h3>
+        <input id="newGoalName" placeholder="Goal name (e.g. New Phone)">
+        <input id="newGoalTarget" type="number" placeholder="Target amount (₦)">
+        <button class="btn-gold" onclick="createGoal()">Create Goal</button>
+      </div>
+      <div class="card">
+        <h3>Your Goals</h3>
+        <div id="goalsList"></div>
+      </div>
+    </div>
+
+    <div id="tab-loans" class="tab-content hidden">
+      <div class="card">
+        <h3>Loan Eligibility</h3>
+        <div class="balance-amount" style="color:var(--primary); font-size:28px;" id="eligibilityAmount">₦0</div>
+        <div id="eligibilityBreakdown"></div>
+        <p id="eligibilityReason" style="color:#c0392b; font-size:12px; margin-top:6px;"></p>
+      </div>
+      <div class="card balance-card">
+        <div class="balance-label">LOAN STATUS <span class="badge" id="loanBadge">None</span></div>
+        <div id="loanDetails" style="display:none; margin-top:10px; text-align:left;">
+          <p style="font-size:13px;">Borrowed: <b id="loanPrincipal">₦0</b></p>
+          <p style="font-size:13px;">Total repayable: <b id="loanTotal">₦0</b></p>
+          <p style="font-size:13px;">Repaid: <b id="loanRepaid">₦0</b></p>
+          <p style="font-size:13px;">Remaining: <b id="loanRemaining">₦0</b></p>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Apply for a Loan</h3>
+        <input id="loanAmount" type="number" placeholder="Amount to borrow">
+        <button class="btn-gold" onclick="applyLoan()">Apply (10% interest)</button>
+      </div>
+      <div class="card">
+        <h3>Repay Loan</h3>
+        <input id="repayAmount" type="number" placeholder="Amount to repay">
+        <button class="btn-gold" onclick="repayLoan()">Repay</button>
+      </div>
+    </div>
+
+    <div id="tab-bills" class="tab-content hidden">
+      <h3 style="color:var(--primary); margin-bottom:10px;">Pay Bills</h3>
+      <div class="bill-grid">
+        <div class="bill-tile active" data-type="airtime" onclick="selectBillType(this)"><div class="bill-icon">📱</div><div class="bill-label">Airtime</div></div>
+        <div class="bill-tile" data-type="data" onclick="selectBillType(this)"><div class="bill-icon">📶</div><div class="bill-label">Data</div></div>
+        <div class="bill-tile" data-type="electricity" onclick="selectBillType(this)"><div class="bill-icon">⚡</div><div class="bill-label">Electricity</div></div>
+        <div class="bill-tile" data-type="tv" onclick="selectBillType(this)"><div class="bill-icon">📺</div><div class="bill-label">TV</div></div>
+      </div>
+      <div class="card">
+        <input id="billProvider" placeholder="Provider (e.g. MTN, EKEDC)">
+        <input id="billAmount" type="number" placeholder="Amount">
+        <button class="btn-gold" onclick="payBill()">Pay Now</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:4000';
+let token = null;
+let selectedBillType = 'airtime';
+
+function showMessage(text) { document.getElementById('message').innerText = text || ''; }
+function showScreen(name) {
+  document.getElementById('loginScreen').classList.toggle('hidden', name !== 'login');
+  document.getElementById('signupScreen').classList.toggle('hidden', name !== 'signup');
+}
+function selectMethod(el) { document.querySelectorAll('.method-box').forEach(m => m.classList.remove('active')); el.classList.add('active'); }
+function selectBillType(el) { document.querySelectorAll('.bill-tile').forEach(b => b.classList.remove('active')); el.classList.add('active'); selectedBillType = el.dataset.type; }
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+  document.getElementById('tab-' + name).classList.remove('hidden');
+  if (name === 'savings') { refreshSavings(); refreshGoals(); }
+  if (name === 'loans') { refreshLoanStatus(); refreshEligibility(); }
+}
+
+async function register() {
+  if (document.getElementById('regPassword').value !== document.getElementById('regPasswordConfirm').value) return showMessage('Passwords do not match');
+  if (!document.getElementById('agreeTerms').checked) return showMessage('Please agree to the Terms & Conditions');
+  const body = { fullName: document.getElementById('regName').value, email: document.getElementById('regEmail').value, phone: document.getElementById('regPhone').value, password: document.getElementById('regPassword').value };
+  const res = await fetch(`${API}/auth/register`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+  token = data.token; showMessage('');
+  enterDashboard(data.user.full_name || data.user.fullName);
+}
+
+async function login() {
+  const body = { email: document.getElementById('loginEmail').value, password: document.getElementById('loginPassword').value };
+  const res = await fetch(`${API}/auth/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+  token = data.token; showMessage('');
+  enterDashboard(data.user.fullName);
+}
+
+function logout() { token = null; document.getElementById('dashboard').classList.add('hidden'); showScreen('login'); }
+
+function enterDashboard(name) {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('signupScreen').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  document.getElementById('greeting').innerText = `Hi, ${(name||'').split(' ')[0] || 'there'} 👋`;
+  refreshBalance(); refreshHistory();
+}
+
+async function refreshBalance() {
+  const res = await fetch(`${API}/wallet/balance`, { headers:{ Authorization:`Bearer ${token}` } });
+  const data = await res.json();
+  document.getElementById('balance').innerText = `₦${data.balanceNaira.toLocaleString()}`;
+}
+
+async function deposit() {
+  const amountNaira = document.getElementById('depositAmount').value;
+  const res = await fetch(`${API}/wallet/deposit`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({amountNaira}) });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+  document.getElementById('depositAmount').value = '';
+  refreshBalance(); refreshHistory();
+}
+
+function showTransferConfirm() {
+  const email = document.getElementById('transferEmail').value;
+  const amount = document.getElementById('transferAmount').value;
+  if (!email || !amount) return showMessage('Enter recipient and amount first');
+  document.getElementById('confirmEmail').innerText = email;
+  document.getElementById('confirmAmount').innerText = `₦${Number(amount).toLocaleString()}`;
+  document.getElementById('transferCard').classList.add('hidden');
+  document.getElementById('confirmCard').classList.remove('hidden');
+}
+function hideTransferConfirm() { document.getElementById('transferCard').classList.remove('hidden'); document.getElementById('confirmCard').classList.add('hidden'); }
+
+async function transfer() {
+  const recipientEmail = document.getElementById('transferEmail').value;
+  const amountNaira = document.getElementById('transferAmount').value;
+  const narration = document.getElementById('transferNote').value;
+  const res = await fetch(`${API}/wallet/transfer`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({recipientEmail, amountNaira, narration}) });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+  document.getElementById('transferEmail').value=''; document.getElementById('transferAmount').value=''; document.getElementById('transferNote').value='';
+  hideTransferConfirm(); refreshBalance(); refreshHistory();
+}
+
+async function refreshHistory() {
+  const res = await fetch(`${API}/wallet/history`, { headers:{ Authorization:`Bearer ${token}` } });
+  const data = await res.json();
+  const list = document.getElementById('historyList'); list.innerHTML = '';
+  if (data.history.length === 0) { list.innerHTML = '<p style="color:#999;font-size:13px;">No transactions yet</p>'; return; }
+  data.history.forEach(tx => {
+    const isCredit = tx.direction === 'credit';
+    const row = document.createElement('div'); row.className = 'tx';
+    row.innerHTML = `<div class="tx-left"><div class="tx-icon ${isCredit?'credit-icon':'debit-icon'}">${isCredit?'↓':'↑'}</div><div><div class="tx-narration">${tx.narration}</div><div class="tx-date">${new Date(tx.created_at).toLocaleString()}</div></div></div><div class="tx-amount ${isCredit?'amount-credit':'amount-debit'}">${isCredit?'+':'-'}₦${tx.amountNaira.toLocaleString()}</div>`;
+    list.appendChild(row);
+  });
+}
+
+// SAVINGS GOALS
+async function refreshSavings() {
+  const res = await fetch(`${API}/savings/balance`, { headers:{ Authorization:`Bearer ${token}` } });
+  const data = await res.json();
+  document.getElementById('savingsBalance').innerText = `₦${data.balanceNaira.toLocaleString()}`;
+}
+
+async function createGoal() {
+  const name = document.getElementById('newGoalName').value;
+  const targetNaira = document.getElementById('newGoalTarget').value;
+  const res = await fetch(`${API}/savings/goals`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({name, targetNaira}) });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+  document.getElementById('newGoalName').value=''; document.getElementById('newGoalTarget').value='';
+  refreshGoals();
+}
+
+async function refreshGoals() {
+  const res = await fetch(`${API}/savings/goals`, { headers:{ Authorization:`Bearer ${token}` } });
+  const data = await res.json();
+  const list = document.getElementById('goalsList'); list.innerHTML = '';
+  if (data.goals.length === 0) { list.innerHTML = '<p style="color:#999;font-size:13px;">No goals yet — create one above</p>'; return; }
+  data.goals.forEach(g => {
+    const div = document.createElement('div'); div.className = 'goal-card';
+    div.innerHTML = `
+      <div class="goal-name">${g.name} ${g.status==='completed' ? '✅' : ''}</div>
+      <div class="goal-nums">₦${g.savedNaira.toLocaleString()} of ₦${g.targetNaira.toLocaleString()} (${g.progressPercent}%)</div>
+      <div class="progress-track"><div class="progress-fill" style="width:${g.progressPercent}%"></div></div>
+      <div class="goal-actions" style="margin-top:10px;">
+        <input type="number" placeholder="₦ Amount" id="goalAmt-${g.id}">
+        <button class="btn-gold btn-gold-small" onclick="fundGoal(${g.id})">Fund</button>
+        <button class="btn-gold btn-gold-small" style="background:#e2e8e5; color:#333;" onclick="withdrawGoal(${g.id})">Withdraw</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+async function fundGoal(goalId) {
+  const amountNaira = document.getElementById(`goalAmt-${goalId}`).value;
+  const res = await fetch(`${API}/savings/goals/${goalId}/fund`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({amountNaira}) });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+  showMessage(''); refreshBalance(); refreshSavings(); refreshGoals();
+}
+
+async function withdrawGoal(goalId) {
+  const amountNaira = document.getElementById(`goalAmt-${goalId}`).value;
+  const res = await fetch(`${API}/savings/goals/${goalId}/withdraw`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({amountNaira}) });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+  showMessage(''); refreshBalance(); refreshSavings(); refreshGoals();
+}
+
+// LOANS
+async function refreshEligibility() {
+  const res = await fetch(`${API}/loans/eligibility`, { headers:{ Authorization:`Bearer ${token}` } });
+  const data = await res.json();
+  document.getElementById('eligibilityAmount').innerText = `₦${data.eligibleAmountNaira.toLocaleString()}`;
+  const bd = document.getElementById('eligibilityBreakdown');
+  document.getElementById('eligibilityReason').innerText = data.reason || '';
+  if (data.breakdown) {
+    bd.innerHTML = `
+      <div class="eligibility-line"><span>Base</span><span>₦${data.breakdown.baseNaira.toLocaleString()}</span></div>
+      <div class="eligibility-line"><span>From deposits</span><span>₦${data.breakdown.fromDepositsNaira.toLocaleString()}</span></div>
+      <div class="eligibility-line"><span>From savings</span><span>₦${data.breakdown.fromSavingsNaira.toLocaleString()}</span></div>
+      <div class="eligibility-line"><span>Repaid loans bonus (${data.breakdown.repaidLoansCount})</span><span>₦${data.breakdown.repaidLoansBonusNaira.toLocaleString()}</span></div>`;
+  } else { bd.innerHTML = ''; }
+}
+
+async function refreshLoanStatus() {
+  const res = await fetch(`${API}/loans/status`, { headers:{ Authorization:`Bearer ${token}` } });
+  const data = await res.json();
+  const badge = document.getElementById('loanBadge'); const details = document.getElementById('loanDetails');
+  if (data.hasActiveLoan) {
+    badge.innerText='Active'; badge.className='badge badge-active'; details.style.display='block';
+    document.getElementById('loanPrincipal').innerText = `₦${data.principalNaira.toLocaleString()}`;
+    document.getElementById('loanTotal').innerText = `₦${data.totalRepayableNaira.toLocaleString()}`;
+    document.getElementById('loanRepaid').innerText = `₦${data.amountRepaidNaira.toLocaleString()}`;
+    document.getElementById('loanRemaining').innerText = `₦${data.remainingNaira.toLocaleString()}`;
+  } else { badge.innerText='None'; badge.className='badge badge-none'; details.style.display='none'; }
+}
+
+async function applyLoan() {
+  const amountNaira = document.getElementById('loanAmount').value;
+  const res = await fetch(`${API}/loans/apply`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({amountNaira}) });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+  document.getElementById('loanAmount').value=''; showMessage('');
+  refreshBalance(); refreshLoanStatus(); refreshEligibility();
+}
+
+async function repayLoan() {
+  const amountNaira = document.getElementById('repayAmount').value;
+  const res = await fetch(`${API}/loans/repay`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({amountNaira}) });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+  document.getElementById('repayAmount').value=''; showMessage('');
+  refreshBalance(); refreshLoanStatus(); refreshEligibility();
+}
+
+// BILLS
+async function payBill() {
+  const provider = document.getElementById('billProvider').value;
+  const amountNaira = document.getElementById('billAmount').value;
+  const res = await fetch(`${API}/bills/pay`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({billType: selectedBillType, provider, amountNaira}) });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+  document.getElementById('billProvider').value=''; document.getElementById('billAmount').value='';
+  refreshBalance();
+}
+</script>
+</body>
+</html>
