@@ -19,6 +19,7 @@
   input:focus, select:focus { box-shadow:0 0 0 2px var(--primary); }
   .btn-gold { width:100%; padding:14px; background:var(--gold); color:#2b1a00; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; margin-top:10px; font-family:'Poppins',sans-serif; }
   .btn-gold-small { padding:10px; font-size:13px; margin-top:6px; }
+  .btn-outline { width:100%; padding:12px; background:#fff; color:var(--primary); border:1.5px solid var(--primary); border-radius:12px; font-size:14px; font-weight:600; cursor:pointer; margin-top:8px; font-family:'Poppins',sans-serif; }
   .link-text { text-align:center; font-size:13px; color:var(--dgrey); margin-top:14px; }
   .link-text b { color:var(--primary); cursor:pointer; }
   .greeting { color:var(--primary); font-size:18px; font-weight:600; margin-bottom:14px; }
@@ -68,6 +69,7 @@
   #message { text-align:center; color:#d33; font-size:13px; min-height:18px; margin-bottom:8px; }
   .hidden { display:none; }
   .checkbox-row { display:flex; align-items:flex-start; gap:8px; margin:10px 0; font-size:12px; color:var(--dgrey); }
+  .resolved-name { font-size:13px; font-weight:600; color:#16a34a; margin:6px 0; padding:8px 10px; background:#e6f4ea; border-radius:8px; }
 </style>
 </head>
 <body>
@@ -135,13 +137,32 @@
         <div class="note">Test mode: uses Paystack sandbox — no real money moves.</div>
         <button class="btn-gold" onclick="deposit()">Fund Wallet</button>
       </div>
-      <div class="card" id="transferCard">
+
+      <div class="card">
         <h3>Send Money</h3>
-        <input id="transferEmail" placeholder="Recipient (Email)">
-        <input id="transferAmount" type="number" placeholder="Amount">
-        <input id="transferNote" placeholder="Note (optional)">
-        <button class="btn-gold" onclick="showTransferConfirm()">Send</button>
+        <div class="method-row">
+          <div class="method-box active" id="sendModeUser" onclick="setSendMode('user')">CashMFB User</div>
+          <div class="method-box" id="sendModeBank" onclick="setSendMode('bank')">Bank Account</div>
+        </div>
+
+        <div id="sendToUser">
+          <input id="transferEmail" placeholder="Recipient (Email)">
+          <input id="transferAmount" type="number" placeholder="Amount">
+          <input id="transferNote" placeholder="Note (optional)">
+          <button class="btn-gold" onclick="showTransferConfirm()">Send</button>
+        </div>
+
+        <div id="sendToBank" class="hidden">
+          <select id="bankSelect"><option value="">Loading banks...</option></select>
+          <input id="bankAccountNumber" placeholder="Account Number" maxlength="10">
+          <button class="btn-outline" onclick="verifyBankAccount()">Verify Account</button>
+          <div id="resolvedName" class="hidden resolved-name"></div>
+          <input id="bankAmount" type="number" placeholder="Amount">
+          <input id="bankReason" placeholder="Reason (optional)">
+          <button class="btn-gold" id="sendToBankBtn" onclick="sendToBank()" disabled>Send to Bank</button>
+        </div>
       </div>
+
       <div class="card hidden" id="confirmCard">
         <h3>Confirm Transfer</h3>
         <p style="font-size:14px;margin-bottom:6px;">To: <b id="confirmEmail"></b></p>
@@ -149,6 +170,7 @@
         <button class="btn-gold" onclick="transfer()">Confirm & Send</button>
         <div class="link-text" onclick="hideTransferConfirm()"><b>Cancel</b></div>
       </div>
+
       <div class="card">
         <h3>Recent Transactions</h3>
         <div id="historyList"></div>
@@ -209,7 +231,8 @@
         <div class="bill-tile" data-type="tv" onclick="selectBillType(this)"><div class="bill-icon">📺</div><div class="bill-label">TV</div></div>
       </div>
       <div class="card">
-        <input id="billProvider" placeholder="Provider (e.g. MTN, EKEDC)">
+        <select id="billProvider"></select>
+        <input id="billMeterOrPhone" placeholder="Phone Number / Meter / Smartcard No.">
         <input id="billAmount" type="number" placeholder="Amount">
         <button class="btn-gold" onclick="payBill()">Pay Now</button>
       </div>
@@ -223,14 +246,46 @@ const API = 'https://cashmfb.onrender.com';
 const PAYSTACK_PUBLIC_KEY = 'pk_test_6c3322f8e218ff508d0b95bfbd2fda7162fb58ba';
 let token = null;
 let selectedBillType = 'airtime';
+let resolvedBankAccountName = null;
+
+const BILL_PROVIDERS = {
+  airtime: ['MTN', 'Airtel', 'Glo', '9mobile'],
+  data: ['MTN', 'Airtel', 'Glo', '9mobile'],
+  electricity: ['EKEDC (Eko Electric)', 'IKEDC (Ikeja Electric)', 'AEDC (Abuja Electric)', 'PHED (Port Harcourt Electric)', 'IBEDC (Ibadan Electric)', 'KEDCO (Kano Electric)', 'JED (Jos Electric)', 'EEDC (Enugu Electric)'],
+  tv: ['DStv', 'GOtv', 'StarTimes']
+};
 
 function showMessage(text) { document.getElementById('message').innerText = text || ''; }
 function showScreen(name) {
   document.getElementById('loginScreen').classList.toggle('hidden', name !== 'login');
   document.getElementById('signupScreen').classList.toggle('hidden', name !== 'signup');
 }
-function selectMethod(el) { document.querySelectorAll('.method-box').forEach(m => m.classList.remove('active')); el.classList.add('active'); }
-function selectBillType(el) { document.querySelectorAll('.bill-tile').forEach(b => b.classList.remove('active')); el.classList.add('active'); selectedBillType = el.dataset.type; }
+function selectMethod(el) { document.querySelectorAll('.method-box').forEach(m => { if (m.id !== 'sendModeUser' && m.id !== 'sendModeBank') m.classList.remove('active'); }); el.classList.add('active'); }
+
+function selectBillType(el) {
+  document.querySelectorAll('.bill-tile').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  selectedBillType = el.dataset.type;
+  populateBillProviders();
+}
+
+function populateBillProviders() {
+  const select = document.getElementById('billProvider');
+  select.innerHTML = '';
+  BILL_PROVIDERS[selectedBillType].forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.innerText = p;
+    select.appendChild(opt);
+  });
+  const meterInput = document.getElementById('billMeterOrPhone');
+  if (selectedBillType === 'airtime' || selectedBillType === 'data') {
+    meterInput.placeholder = 'Phone Number';
+  } else if (selectedBillType === 'electricity') {
+    meterInput.placeholder = 'Meter Number';
+  } else {
+    meterInput.placeholder = 'Smartcard/IUC Number';
+  }
+}
 
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
@@ -238,6 +293,87 @@ function switchTab(name) {
   document.getElementById('tab-' + name).classList.remove('hidden');
   if (name === 'savings') { refreshSavings(); refreshGoals(); }
   if (name === 'loans') { refreshLoanStatus(); refreshEligibility(); }
+  if (name === 'bills') { populateBillProviders(); }
+}
+
+function setSendMode(mode) {
+  document.getElementById('sendModeUser').classList.toggle('active', mode === 'user');
+  document.getElementById('sendModeBank').classList.toggle('active', mode === 'bank');
+  document.getElementById('sendToUser').classList.toggle('hidden', mode !== 'user');
+  document.getElementById('sendToBank').classList.toggle('hidden', mode !== 'bank');
+  if (mode === 'bank' && document.getElementById('bankSelect').options.length <= 1) {
+    loadBanks();
+  }
+}
+
+async function loadBanks() {
+  const select = document.getElementById('bankSelect');
+  try {
+    const res = await fetch(`${API}/wallet/banks`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    select.innerHTML = '<option value="">Select Bank</option>';
+    data.banks.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.code; opt.innerText = b.name;
+      select.appendChild(opt);
+    });
+  } catch (err) {
+    select.innerHTML = '<option value="">Could not load banks</option>';
+  }
+}
+
+async function verifyBankAccount() {
+  const bankCode = document.getElementById('bankSelect').value;
+  const accountNumber = document.getElementById('bankAccountNumber').value;
+  const resolvedDiv = document.getElementById('resolvedName');
+  const sendBtn = document.getElementById('sendToBankBtn');
+  resolvedDiv.classList.add('hidden');
+  sendBtn.disabled = true;
+  resolvedBankAccountName = null;
+
+  if (!bankCode || !accountNumber) return showMessage('Select a bank and enter account number');
+
+  showMessage('Verifying account...');
+  const res = await fetch(`${API}/wallet/verify-account`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ accountNumber, bankCode })
+  });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+
+  showMessage('');
+  resolvedBankAccountName = data.accountName;
+  resolvedDiv.innerText = `✓ ${data.accountName}`;
+  resolvedDiv.classList.remove('hidden');
+  sendBtn.disabled = false;
+}
+
+async function sendToBank() {
+  const bankCode = document.getElementById('bankSelect').value;
+  const accountNumber = document.getElementById('bankAccountNumber').value;
+  const amountNaira = document.getElementById('bankAmount').value;
+  const reason = document.getElementById('bankReason').value;
+
+  if (!resolvedBankAccountName) return showMessage('Please verify the account first');
+  if (!amountNaira || Number(amountNaira) <= 0) return showMessage('Enter a valid amount');
+
+  const res = await fetch(`${API}/wallet/send-to-bank`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ accountNumber, bankCode, amountNaira, reason })
+  });
+  const data = await res.json();
+  if (!res.ok) return showMessage(data.error);
+
+  showMessage('');
+  document.getElementById('bankAccountNumber').value = '';
+  document.getElementById('bankAmount').value = '';
+  document.getElementById('bankReason').value = '';
+  document.getElementById('resolvedName').classList.add('hidden');
+  document.getElementById('sendToBankBtn').disabled = true;
+  resolvedBankAccountName = null;
+  refreshBalance(); refreshHistory();
 }
 
 async function register() {
@@ -267,7 +403,7 @@ function enterDashboard(name) {
   document.getElementById('signupScreen').classList.add('hidden');
   document.getElementById('dashboard').classList.remove('hidden');
   document.getElementById('greeting').innerText = `Hi, ${(name||'').split(' ')[0] || 'there'} 👋`;
-  refreshBalance(); refreshHistory();
+  refreshBalance(); refreshHistory(); populateBillProviders();
 }
 
 async function refreshBalance() {
@@ -323,10 +459,9 @@ function showTransferConfirm() {
   if (!email || !amount) return showMessage('Enter recipient and amount first');
   document.getElementById('confirmEmail').innerText = email;
   document.getElementById('confirmAmount').innerText = `₦${Number(amount).toLocaleString()}`;
-  document.getElementById('transferCard').classList.add('hidden');
   document.getElementById('confirmCard').classList.remove('hidden');
 }
-function hideTransferConfirm() { document.getElementById('transferCard').classList.remove('hidden'); document.getElementById('confirmCard').classList.add('hidden'); }
+function hideTransferConfirm() { document.getElementById('confirmCard').classList.add('hidden'); }
 
 async function transfer() {
   const recipientEmail = document.getElementById('transferEmail').value;
@@ -455,11 +590,12 @@ async function repayLoan() {
 // BILLS
 async function payBill() {
   const provider = document.getElementById('billProvider').value;
+  const meterOrPhone = document.getElementById('billMeterOrPhone').value;
   const amountNaira = document.getElementById('billAmount').value;
-  const res = await fetch(`${API}/bills/pay`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({billType: selectedBillType, provider, amountNaira}) });
+  const res = await fetch(`${API}/bills/pay`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({billType: selectedBillType, provider, meterOrPhone, amountNaira}) });
   const data = await res.json();
   if (!res.ok) return showMessage(data.error);
-  document.getElementById('billProvider').value=''; document.getElementById('billAmount').value='';
+  document.getElementById('billMeterOrPhone').value=''; document.getElementById('billAmount').value='';
   refreshBalance();
 }
 </script>
