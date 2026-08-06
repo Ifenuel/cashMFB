@@ -231,8 +231,9 @@
         <div class="bill-tile" data-type="tv" onclick="selectBillType(this)"><div class="bill-icon">📺</div><div class="bill-label">TV</div></div>
       </div>
       <div class="card">
-        <select id="billProvider"></select>
+        <select id="billProvider" onchange="onProviderChange()"></select>
         <input id="billMeterOrPhone" placeholder="Phone Number / Meter / Smartcard No.">
+        <select id="billPlan" class="hidden" onchange="onPlanChange()"></select>
         <input id="billAmount" type="number" placeholder="Amount">
         <button class="btn-gold" onclick="payBill()">Pay Now</button>
       </div>
@@ -247,6 +248,7 @@ const PAYSTACK_PUBLIC_KEY = 'pk_test_6c3322f8e218ff508d0b95bfbd2fda7162fb58ba';
 let token = null;
 let selectedBillType = 'airtime';
 let resolvedBankAccountName = null;
+let selectedPlan = null;
 
 const BILL_PROVIDERS = {
   airtime: ['MTN', 'Airtel', 'Glo', '9mobile'],
@@ -285,6 +287,58 @@ function populateBillProviders() {
   } else {
     meterInput.placeholder = 'Smartcard/IUC Number';
   }
+  onProviderChange();
+}
+
+// --- VTpass plan selection (Data bills) ---
+function onProviderChange() {
+  selectedPlan = null;
+  const planSelect = document.getElementById('billPlan');
+  const amountInput = document.getElementById('billAmount');
+
+  if (selectedBillType === 'data') {
+    planSelect.classList.remove('hidden');
+    amountInput.classList.add('hidden');
+    loadBillPlans();
+  } else {
+    planSelect.classList.add('hidden');
+    amountInput.classList.remove('hidden');
+    amountInput.value = '';
+  }
+}
+
+async function loadBillPlans() {
+  const provider = document.getElementById('billProvider').value;
+  const planSelect = document.getElementById('billPlan');
+  planSelect.innerHTML = '<option value="">Loading plans...</option>';
+
+  try {
+    const res = await fetch(`${API}/vtpass/plans?billType=${selectedBillType}&provider=${encodeURIComponent(provider)}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok || !data.plans || data.plans.length === 0) {
+      planSelect.innerHTML = '<option value="">No plans available</option>';
+      return;
+    }
+    planSelect.innerHTML = '<option value="">Select a plan</option>';
+    data.plans.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.variation_code;
+      opt.dataset.amount = p.variation_amount;
+      opt.innerText = `${p.name} — ₦${p.variation_amount}`;
+      planSelect.appendChild(opt);
+    });
+  } catch (err) {
+    planSelect.innerHTML = '<option value="">Failed to load plans</option>';
+  }
+}
+
+function onPlanChange() {
+  const planSelect = document.getElementById('billPlan');
+  const selected = planSelect.options[planSelect.selectedIndex];
+  selectedPlan = planSelect.value;
+  document.getElementById('billAmount').value = selected ? selected.dataset.amount : '';
 }
 
 function switchTab(name) {
