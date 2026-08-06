@@ -132,7 +132,7 @@
           <div class="method-box" onclick="selectMethod(this)">Bank Transfer</div>
           <div class="method-box" onclick="selectMethod(this)">USSD</div>
         </div>
-        <div class="note">Demo mode: credits your wallet directly for testing.</div>
+        <div class="note">Test mode: uses Paystack sandbox — no real money moves.</div>
         <button class="btn-gold" onclick="deposit()">Fund Wallet</button>
       </div>
       <div class="card" id="transferCard">
@@ -217,8 +217,10 @@
   </div>
 </div>
 
+<script src="https://js.paystack.co/v1/inline.js"></script>
 <script>
 const API = 'https://cashmfb.onrender.com';
+const PAYSTACK_PUBLIC_KEY = 'pk_test_6c3322f8e218ff508d0b95bfbd2fda7162fb58ba';
 let token = null;
 let selectedBillType = 'airtime';
 
@@ -276,11 +278,40 @@ async function refreshBalance() {
 
 async function deposit() {
   const amountNaira = document.getElementById('depositAmount').value;
-  const res = await fetch(`${API}/wallet/deposit`, { method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token}`}, body: JSON.stringify({amountNaira}) });
+  if (!amountNaira || Number(amountNaira) <= 0) return showMessage('Enter a valid amount');
+
+  const initRes = await fetch(`${API}/wallet/deposit/initialize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ amountNaira })
+  });
+  const initData = await initRes.json();
+  if (!initRes.ok) return showMessage(initData.error);
+
+  const handler = PaystackPop.setup({
+    key: PAYSTACK_PUBLIC_KEY,
+    access_code: initData.accessCode,
+    onClose: function () {
+      showMessage('Payment window closed');
+    },
+    callback: function (response) {
+      verifyDeposit(response.reference);
+    }
+  });
+  handler.openIframe();
+}
+
+async function verifyDeposit(reference) {
+  showMessage('Confirming payment...');
+  const res = await fetch(`${API}/wallet/deposit/verify/${reference}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
   const data = await res.json();
   if (!res.ok) return showMessage(data.error);
+  showMessage('');
   document.getElementById('depositAmount').value = '';
-  refreshBalance(); refreshHistory();
+  refreshBalance();
+  refreshHistory();
 }
 
 function showTransferConfirm() {

@@ -116,7 +116,79 @@ router.post('/send-to-bank', async (req, res) => {
   }
 });
 
-// POST /wallet/deposit  { amountNaira }
+// POST /wallet/deposit/initialize  { amountNaira }
+router.post('/deposit/initialize', async (req, res) => {
+  const { amountNaira } = req.body;
+  const amountKobo = Math.round(Number(amountNaira) * 100);
+  if (!amountKobo || amountKobo <= 0) return res.status(400).json({ error: 'Invalid amount' });
+
+  try {
+    const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [req.userId]);
+    const email = userResult.rows[0].email;
+    const reference = generateReference();
+
+    const response = await paystack.post('/transaction/initialize', {
+      email,
+      amount: amountKobo,
+      reference,
+    });
+
+    res.json({
+      accessCode: response.data.data.access_code,
+      reference,
+    });
+  } catch (err) {
+    console.error(err.response?.data || err.message);
+    res.status(500).json({ error: 'Could not initialize payment' });
+  }
+});
+
+// GET /wallet/deposit/verify/:reference
+router.get('/deposit/verify/:reference', async (req, res) => {
+  const { reference } = req.params;
+  const client = await pool.connect();
+  try {
+    const verifyResponse = await paystack.get(`/transaction/verify/${reference}`);
+    const data = verifyResponse.data.data;
+
+    if (data.status !== 'success') {
+      client.release();
+      return res.status(400).json({ error: 'Payment not successful' });
+    }
+
+    const existing = await client.query('SELECT id FROM transactions WHERE reference = $1', [reference]);
+    if (existing.rows[0]) {
+      client.release();
+      return res.json({ message: 'Already processed' });
+    }
+
+    await client.query('BEGIN');
+    const walletResult = await client.query('SELECT * FROM wallets WHERE user_id = $1 FOR UPDATE', [req.userId]);
+    const wallet = walletResult.rows[0];
+    const amountKobo = data.amount;
+    const newBalance = Number(wallet.balance) + amountKobo;
+
+    await client.query('UPDATE wallets SET balance = $1 WHERE id = $2', [newBalance, wallet.id]);
+    const txResult = await client.query(
+      `INSERT INTO transactions (reference, type, narration) VALUES ($1, 'deposit', 'Wallet funding via Paystack') RETURNING id`,
+      [reference]
+    );
+    await client.query(
+      `INSERT INTO ledger_entries (transaction_id, wallet_id, direction, amount, balance_after) VALUES ($1, $2, 'credit', $3, $4)`,
+      [txResult.rows[0].id, wallet.id, amountKobo, newBalance]
+    );
+    await client.query('COMMIT');
+    res.json({ message: 'Deposit successful', newBalanceNaira: newBalance / 100 });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err.response?.data || err.message);
+    res.status(500).json({ error: 'Verification failed' });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /wallet/deposit  { amountNaira }  -- legacy demo route, kept for backward compatibility
 router.post('/deposit', async (req, res) => {
   const { amountNaira } = req.body;
   const amountKobo = Math.round(Number(amountNaira) * 100);
