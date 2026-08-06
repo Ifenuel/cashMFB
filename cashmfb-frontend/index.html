@@ -288,10 +288,20 @@ async function deposit() {
   const initData = await initRes.json();
   if (!initRes.ok) return showMessage(initData.error);
 
-  showMessage('Opening payment window...');
-  PaystackPop.resumeTransaction(initData.accessCode);
-
-  setTimeout(() => verifyDeposit(initData.reference), 8000);
+  showMessage('');
+  const handler = PaystackPop.setup({
+    key: PAYSTACK_PUBLIC_KEY,
+    email: initData.email,
+    amount: Math.round(Number(amountNaira) * 100),
+    ref: initData.reference,
+    callback: function (response) {
+      verifyDeposit(response.reference);
+    },
+    onClose: function () {
+      showMessage('Payment window closed');
+    }
+  });
+  handler.openIframe();
 }
 
 async function verifyDeposit(reference) {

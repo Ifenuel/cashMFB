@@ -136,6 +136,7 @@ router.post('/deposit/initialize', async (req, res) => {
     res.json({
       accessCode: response.data.data.access_code,
       reference,
+      email,
     });
   } catch (err) {
     console.error(err.response?.data || err.message);
