@@ -70,6 +70,14 @@
   .hidden { display:none; }
   .checkbox-row { display:flex; align-items:flex-start; gap:8px; margin:10px 0; font-size:12px; color:var(--dgrey); }
   .resolved-name { font-size:13px; font-weight:600; color:#16a34a; margin:6px 0; padding:8px 10px; background:#e6f4ea; border-radius:8px; }
+  .chip-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:10px 0; }
+  .plan-chip { background:var(--field); border-radius:12px; padding:10px 8px; text-align:center; font-size:12px; font-weight:600; color:var(--dgrey); cursor:pointer; border:1.5px solid transparent; }
+  .plan-chip.active { background:#f3ecfa; color:var(--primary); border-color:var(--primary); }
+  .plan-chip-price { display:block; font-size:12px; color:var(--gold); margin-top:3px; font-weight:700; }
+  .category-tabs { display:flex; gap:6px; margin:10px 0 4px; }
+  .category-tab { flex:1; text-align:center; padding:8px 4px; border-radius:10px; background:var(--field); font-size:12px; color:var(--dgrey); cursor:pointer; font-weight:600; }
+  .category-tab.active { background:var(--primary); color:#fff; }
+  .plan-loading { font-size:12px; color:#999; text-align:center; padding:10px 0; }
 </style>
 </head>
 <body>
@@ -233,7 +241,16 @@
       <div class="card">
         <select id="billProvider" onchange="onProviderChange()"></select>
         <input id="billMeterOrPhone" placeholder="Phone Number / Meter / Smartcard No.">
-        <select id="billPlan" class="hidden" onchange="onPlanChange()"></select>
+
+        <div id="airtimeAmounts" class="hidden">
+          <div class="chip-grid" id="airtimeChipGrid"></div>
+        </div>
+
+        <div id="dataPlanSection" class="hidden">
+          <div class="category-tabs" id="planCategoryTabs"></div>
+          <div class="chip-grid" id="planChipGrid"></div>
+        </div>
+
         <input id="billAmount" type="number" placeholder="Amount">
         <button class="btn-gold" onclick="payBill()">Pay Now</button>
       </div>
@@ -290,27 +307,64 @@ function populateBillProviders() {
   onProviderChange();
 }
 
-// --- VTpass plan selection (Data bills) ---
+// --- VTpass plan selection (Data bills, grouped like Opay) + Airtime quick amounts ---
+const AIRTIME_QUICK_AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
+let planCategories = {};
+let activeCategory = null;
+
+function categorizePlanName(name) {
+  const n = (name || '').toLowerCase();
+  if (/\b1\s*day\b|24\s*hrs?|24\s*hours?|\bdaily\b/.test(n)) return 'Daily';
+  if (/\b7\s*days?\b|\bweekly\b|\bweek\b/.test(n)) return 'Weekly';
+  if (/\b30\s*days?\b|\bmonthly\b|\bmonth\b/.test(n)) return 'Monthly';
+  return 'Other';
+}
+
 function onProviderChange() {
   selectedPlan = null;
-  const planSelect = document.getElementById('billPlan');
+  const airtimeSection = document.getElementById('airtimeAmounts');
+  const dataSection = document.getElementById('dataPlanSection');
   const amountInput = document.getElementById('billAmount');
 
-  if (selectedBillType === 'data') {
-    planSelect.classList.remove('hidden');
+  airtimeSection.classList.add('hidden');
+  dataSection.classList.add('hidden');
+  amountInput.classList.remove('hidden');
+  amountInput.value = '';
+
+  if (selectedBillType === 'airtime') {
+    airtimeSection.classList.remove('hidden');
+    renderAirtimeChips();
+  } else if (selectedBillType === 'data') {
+    dataSection.classList.remove('hidden');
     amountInput.classList.add('hidden');
     loadBillPlans();
-  } else {
-    planSelect.classList.add('hidden');
-    amountInput.classList.remove('hidden');
-    amountInput.value = '';
   }
+}
+
+function renderAirtimeChips() {
+  const grid = document.getElementById('airtimeChipGrid');
+  grid.innerHTML = '';
+  AIRTIME_QUICK_AMOUNTS.forEach(amt => {
+    const chip = document.createElement('div');
+    chip.className = 'plan-chip';
+    chip.innerText = `₦${amt.toLocaleString()}`;
+    chip.onclick = () => {
+      document.querySelectorAll('#airtimeChipGrid .plan-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      document.getElementById('billAmount').value = amt;
+    };
+    grid.appendChild(chip);
+  });
 }
 
 async function loadBillPlans() {
   const provider = document.getElementById('billProvider').value;
-  const planSelect = document.getElementById('billPlan');
-  planSelect.innerHTML = '<option value="">Loading plans...</option>';
+  const tabsEl = document.getElementById('planCategoryTabs');
+  const gridEl = document.getElementById('planChipGrid');
+  tabsEl.innerHTML = '';
+  gridEl.innerHTML = '<div class="plan-loading">Loading plans...</div>';
+  planCategories = {};
+  activeCategory = null;
 
   try {
     const res = await fetch(`${API}/vtpass/plans?billType=${selectedBillType}&provider=${encodeURIComponent(provider)}`, {
@@ -318,27 +372,63 @@ async function loadBillPlans() {
     });
     const data = await res.json();
     if (!res.ok || !data.plans || data.plans.length === 0) {
-      planSelect.innerHTML = '<option value="">No plans available</option>';
+      gridEl.innerHTML = '<div class="plan-loading">No plans available</div>';
       return;
     }
-    planSelect.innerHTML = '<option value="">Select a plan</option>';
+
+    const order = ['Daily', 'Weekly', 'Monthly', 'Other'];
+    order.forEach(cat => planCategories[cat] = []);
     data.plans.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.variation_code;
-      opt.dataset.amount = p.variation_amount;
-      opt.innerText = `${p.name} — ₦${p.variation_amount}`;
-      planSelect.appendChild(opt);
+      planCategories[categorizePlanName(p.name)].push(p);
     });
+
+    const nonEmpty = order.filter(cat => planCategories[cat].length > 0);
+    if (nonEmpty.length === 0) {
+      gridEl.innerHTML = '<div class="plan-loading">No plans available</div>';
+      return;
+    }
+
+    nonEmpty.forEach(cat => {
+      const tab = document.createElement('div');
+      tab.className = 'category-tab';
+      tab.innerText = cat;
+      tab.onclick = () => setActiveCategory(cat);
+      tab.dataset.cat = cat;
+      tabsEl.appendChild(tab);
+    });
+
+    setActiveCategory(nonEmpty[0]);
   } catch (err) {
-    planSelect.innerHTML = '<option value="">Failed to load plans</option>';
+    gridEl.innerHTML = '<div class="plan-loading">Failed to load plans</div>';
   }
 }
 
-function onPlanChange() {
-  const planSelect = document.getElementById('billPlan');
-  const selected = planSelect.options[planSelect.selectedIndex];
-  selectedPlan = planSelect.value;
-  document.getElementById('billAmount').value = selected ? selected.dataset.amount : '';
+function setActiveCategory(cat) {
+  activeCategory = cat;
+  document.querySelectorAll('#planCategoryTabs .category-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.cat === cat);
+  });
+  renderPlanChips(planCategories[cat] || []);
+}
+
+function renderPlanChips(plans) {
+  const gridEl = document.getElementById('planChipGrid');
+  gridEl.innerHTML = '';
+  selectedPlan = null;
+  document.getElementById('billAmount').value = '';
+
+  plans.forEach(p => {
+    const chip = document.createElement('div');
+    chip.className = 'plan-chip';
+    chip.innerHTML = `${p.name}<span class="plan-chip-price">₦${p.variation_amount}</span>`;
+    chip.onclick = () => {
+      document.querySelectorAll('#planChipGrid .plan-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      selectedPlan = p.variation_code;
+      document.getElementById('billAmount').value = p.variation_amount;
+    };
+    gridEl.appendChild(chip);
+  });
 }
 
 function switchTab(name) {
