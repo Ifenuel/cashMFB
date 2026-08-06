@@ -288,17 +288,10 @@ async function deposit() {
   const initData = await initRes.json();
   if (!initRes.ok) return showMessage(initData.error);
 
-  const handler = PaystackPop.setup({
-    key: PAYSTACK_PUBLIC_KEY,
-    access_code: initData.accessCode,
-    onClose: function () {
-      showMessage('Payment window closed');
-    },
-    callback: function (response) {
-      verifyDeposit(response.reference);
-    }
-  });
-  handler.openIframe();
+  showMessage('Opening payment window...');
+  PaystackPop.resumeTransaction(initData.accessCode);
+
+  setTimeout(() => verifyDeposit(initData.reference), 8000);
 }
 
 async function verifyDeposit(reference) {
